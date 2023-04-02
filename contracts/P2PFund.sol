@@ -31,7 +31,9 @@ contract P2PFund{
 
     Project[] public projects;
     mapping(address => Investment[]) investments_mapping;
+    mapping(address => mapping(uint256 => Investment[])) investor_project_mapping;
     mapping(uint256 => Project) public projects_mapping;
+    mapping(address => mapping(uint256=>uint256)) project_net_invested_by_investor;
     mapping(uint256 => uint256) public project_to_net_investment_map; 
 
     constructor(address _FundTokenAddress){
@@ -80,9 +82,9 @@ contract P2PFund{
         newInvestment.timestamp=block.timestamp;
         newInvestment.investment_amount=amount;
         project_to_net_investment_map[projectId]+=amount;
-
-        //TODO: Do Token Transfer Logic Here
         investments_mapping[msg.sender].push(newInvestment);
+        investor_project_mapping[msg.sender][projectId].push(newInvestment);
+        project_net_invested_by_investor[msg.sender][projectId]+=amount;
         IERC20(FundTokenAddress).transfer(address(this), amount);
     }
 
@@ -91,4 +93,18 @@ contract P2PFund{
         require(projects_mapping[projectId].fund_end_date<block.timestamp, "Fund End Date Has Not Elapsed yet");
         IERC20(FundTokenAddress).transfer(msg.sender, project_to_net_investment_map[projectId]);
     }
+
+    function payDebtToInvestor(uint256 projectId, address investor_address) public messageSenderNotZero{
+        require(projects_mapping[projectId].project_owner==msg.sender, "Project's owner is not message sender");
+        require(projects_mapping[projectId].debt_repayment_date<block.timestamp, "Project Repayment Date Has Not Reached Yet");
+        require(project_net_invested_by_investor[investor_address][projectId] > 0, "investor with given address has not invested in the project");
+        //Takes a year = 365.25 days accounting for leap year, thus 365.25 * 24 * 60 * 60
+        uint256 totalSecondsInYear=31557600;
+        uint256 amountToBePayed= project_net_invested_by_investor[investor_address][projectId] * 
+        (1 + (projects_mapping[projectId].debt_annual_interest_rate/(totalSecondsInYear *100))*
+        (block.timestamp - projects_mapping[projectId].fund_end_date) );
+
+        IERC20(FundTokenAddress).transferFrom(msg.sender, investor_address,amountToBePayed);
+    }
+
 }
