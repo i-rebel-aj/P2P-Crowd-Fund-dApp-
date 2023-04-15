@@ -50,6 +50,7 @@ contract P2PFund{
     string constant private ERROR_NOT_PROJECT_OWNER="Project's owner is not message sender";
     string constant private ERROR_NOT_PROJECT_INVESTOR="investor with given address has not invested in the project";
     string constant private ERROR_FUND_NOT_STARTED="Fundraise for the given project not started yet";
+    string constant private ERROR_FUND_CLOSED="Fundraise for the given project Has Been closed";
     string constant private ERROR_PROJECT_OWNER_NOT_PERMITTED="Investor can not be project owner himself";
 
     constructor(address _FundTokenAddress){
@@ -90,6 +91,8 @@ contract P2PFund{
         require(projects_mapping[projectId].project_owner!=address(0), ERROR_PROJECT_NOT_FOUND);
         require(projects_mapping[projectId].project_owner!=msg.sender, ERROR_PROJECT_OWNER_NOT_PERMITTED);
         require(block.timestamp > projects_mapping[projectId].fund_start_date, ERROR_FUND_NOT_STARTED);
+        require(block.timestamp < projects_mapping[projectId].fund_end_date, ERROR_FUND_CLOSED);
+
         uint256 alreadyInvestedAmount=project_to_net_investment_map[projectId];
         if(amount>projects_mapping[projectId].fund_target-alreadyInvestedAmount){
             revert("Amount that is being invested can not exceed max fund target required");
@@ -103,7 +106,7 @@ contract P2PFund{
         investments_mapping[msg.sender].push(newInvestment);
         investor_project_mapping[msg.sender][projectId].push(newInvestment);
         project_net_invested_by_investor[msg.sender][projectId]+=amount;
-        IERC20(FundTokenAddress).transfer(address(this), amount);
+        IERC20(FundTokenAddress).transferFrom(msg.sender, address(this), amount);
 
         emit NewInvestmentMade(msg.sender, projectId, amount);
     }
