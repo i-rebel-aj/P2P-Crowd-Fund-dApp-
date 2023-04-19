@@ -52,6 +52,7 @@ contract P2PFund{
     string constant private ERROR_FUND_NOT_STARTED="Fundraise for the given project not started yet";
     string constant private ERROR_FUND_CLOSED="Fundraise for the given project Has Been closed";
     string constant private ERROR_PROJECT_OWNER_NOT_PERMITTED="Investor can not be project owner himself";
+    string constant private ERROR_FUND_NOT_CLOSED="Fund End Date Has Not Elapsed yet";
 
     constructor(address _FundTokenAddress){
         require(_FundTokenAddress != address(0), "Fund Token Address Can Not Be A Zero Addresss");
@@ -63,6 +64,10 @@ contract P2PFund{
         _;
     }
 
+    modifier projectExists(uint256 projectId){
+        require(projects_mapping[projectId].project_owner!=address(0), ERROR_PROJECT_NOT_FOUND);
+        _;
+    }
     function addNewProject(string memory project_name, uint256 fund_start_date, uint256 fund_end_date, uint256 debt_annual_interest_rate, uint256 debt_end_date, uint256 fund_target) public {
     
         Project memory newProject;
@@ -86,9 +91,7 @@ contract P2PFund{
         projects_mapping[newProject.project_id]=newProject;
         emit NewProjectAdded(newProject.project_id);
     }
-
-    function investInProject(uint256 projectId, uint256 amount) public messageSenderNotZero{
-        require(projects_mapping[projectId].project_owner!=address(0), ERROR_PROJECT_NOT_FOUND);
+    function investInProject(uint256 projectId, uint256 amount) public messageSenderNotZero projectExists(projectId){
         require(projects_mapping[projectId].project_owner!=msg.sender, ERROR_PROJECT_OWNER_NOT_PERMITTED);
         require(block.timestamp > projects_mapping[projectId].fund_start_date, ERROR_FUND_NOT_STARTED);
         require(block.timestamp < projects_mapping[projectId].fund_end_date, ERROR_FUND_CLOSED);
@@ -111,13 +114,13 @@ contract P2PFund{
         emit NewInvestmentMade(msg.sender, projectId, amount);
     }
 
-    function releaseFundsToProjectOwner(uint256 projectId) public messageSenderNotZero{
+    function releaseFundsToProjectOwner(uint256 projectId) public messageSenderNotZero projectExists(projectId){
         require(projects_mapping[projectId].project_owner==msg.sender, ERROR_NOT_PROJECT_OWNER);
-        require(projects_mapping[projectId].fund_end_date<block.timestamp, "Fund End Date Has Not Elapsed yet");
+        require(projects_mapping[projectId].fund_end_date<block.timestamp, ERROR_FUND_NOT_CLOSED);
         IERC20(FundTokenAddress).transfer(msg.sender, project_to_net_investment_map[projectId]);
     }
 
-    function payDebtToInvestor(uint256 projectId, address investor_address) public messageSenderNotZero{
+    function payDebtToInvestor(uint256 projectId, address investor_address) public messageSenderNotZero projectExists(projectId){
         require(projects_mapping[projectId].project_owner==msg.sender, ERROR_NOT_PROJECT_OWNER);
         require(projects_mapping[projectId].debt_repayment_date<block.timestamp, "Project Repayment Date Has Not Reached Yet");
         require(project_net_invested_by_investor[investor_address][projectId] > 0, ERROR_NOT_PROJECT_INVESTOR);

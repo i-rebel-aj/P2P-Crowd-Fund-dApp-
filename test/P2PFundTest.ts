@@ -30,7 +30,8 @@ enum revertMessages{
     ERROR_NOT_PROJECT_INVESTOR="investor with given address has not invested in the project",
     FUND_NOT_STARTED="Fundraise for the given project not started yet",
     ERROR_PROJECT_OWNER_NOT_PERMITTED="Investor can not be project owner himself",
-    ERROR_FUND_CLOSED="Fundraise for the given project Has Been closed"
+    ERROR_FUND_CLOSED="Fundraise for the given project Has Been closed",
+    ERROR_FUND_NOT_CLOSED="Fund End Date Has Not Elapsed yet"
 
 }
 
@@ -129,6 +130,27 @@ describe('P2P Fund Contract',async () => {
         })
         it("Smart contract should have updated Balance", async()=>{
             expect(await P2PFundTokenContract.balanceOf(P2PFund_Contact.address)).to.be.equal(50)
+        })
+        it("Investment Must Not be made Once Fund Time Period has Ended", async()=>{
+            const firstProjectEndTime=Projects[0].fund_end_date
+            const newEpoch=firstProjectEndTime+ 60*60
+            await time.setNextBlockTimestamp(newEpoch)
+            await P2PFundTokenContract.connect(investor1).approve(P2PFund_Contact.address, 50)
+            expect(await P2PFundTokenContract.balanceOf(P2PFund_Contact.address)).to.be.equal(50)
+        })
+    })
+    describe("Claiming Invested Funds", ()=>{
+        it("Should revert if Project Id is Invalid", async()=>{
+            expect(P2PFund_Contact.releaseFundsToProjectOwner(1)).to.be.revertedWith(revertMessages.ERROR_PROJECT_NOT_FOUND)
+        })
+        it("Should revert if claimer is not project owner", async()=>{
+            expect(P2PFund_Contact.connect(investor1).releaseFundsToProjectOwner(1)).to.be.revertedWith(revertMessages.ERROR_NOT_PROJECT_OWNER)
+        })
+        it("Should revert if Fund Has Not Ended", async()=>{
+            expect(P2PFund_Contact.connect(investor1).releaseFundsToProjectOwner(1)).to.be.revertedWith(revertMessages.ERROR_FUND_NOT_CLOSED)
+        })
+        it("", async()=>{
+
         })
     })
 })
